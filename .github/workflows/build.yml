@@ -8,16 +8,57 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: android-actions/setup-android@v3
-      - name: Install Gradle wrapper
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Crear estructura del proyecto
         run: |
-          gradle wrapper --gradle-version 8.2
+          mkdir -p app/src/main/java/com/chacarestaurante/pos
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p gradle/wrapper
+
+          # Mover archivos a sus carpetas correctas
+          [ -f "MainActivity.java" ] && mv MainActivity.java app/src/main/java/com/chacarestaurante/pos/
+          [ -f "AndroidManifest.xml" ] && mv AndroidManifest.xml app/src/main/
+          [ -f "cadenas.xml" ] && mv cadenas.xml app/src/main/res/values/strings.xml
+          [ -f "estilos.xml" ] && mv estilos.xml app/src/main/res/values/styles.xml
+          [ -f "rutas_proveedor_archivo.xml" ] && mv rutas_proveedor_archivo.xml app/src/main/res/xml/file_provider_paths.xml
+          [ -f "gradle-wrapper.properties" ] && mv gradle-wrapper.properties gradle/wrapper/
+          [ -f "configuración.gradle" ] && mv configuración.gradle app/build.gradle
+          [ -f "propiedades de gradle" ] && mv "propiedades de gradle" gradle.properties
+
+          echo "Estructura creada"
+          find . -type f | grep -v ".git" | sort
+
+      - name: Crear gradlew
+        run: |
+          cat > gradlew << 'EOF'
+          #!/bin/sh
+          APP_HOME=$(cd "$(dirname "$0")" && pwd -P)
+          CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+          if [ -n "$JAVA_HOME" ]; then JAVACMD="$JAVA_HOME/bin/java"
+          else JAVACMD="java"; fi
+          exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+          EOF
           chmod +x gradlew
-      - run: ./gradlew assembleDebug --no-daemon
+
+      - name: Descargar gradle wrapper jar
+        run: |
+          mkdir -p gradle/wrapper
+          curl -L "https://github.com/gradle/gradle/raw/v8.2.0/gradle/wrapper/gradle-wrapper.jar" \
+            -o gradle/wrapper/gradle-wrapper.jar
+
+      - name: Build APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
       - uses: actions/upload-artifact@v4
         with:
           name: ChacaPOS-APK
